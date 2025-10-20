@@ -1,5 +1,6 @@
 from maspy import *
 
+
 class AgenteVendedor(Agent):
     def __init__(self, agt_name):
         super().__init__(agt_name)
@@ -7,7 +8,7 @@ class AgenteVendedor(Agent):
         self.add(Goal("vender"))
 
     @pl(gain, Goal("vender"), Belief("negociar"))
-    def venderCarro(self, src):
+    def iniciarLeilao(self, src):
         self.print("Vou vender um carro")
         self.send("AgenteComprador", tell, Belief("temCarro"), "S2B")
 
@@ -27,11 +28,9 @@ class AgenteComprador(Agent):
         self.send("AgenteVendedor", achieve, Goal("negociar"), "S2B")
         self.stop_cycle()
 
-
-if __name__ == "main":
-    comprador = AgenteComprador("AgenteComprador")
-    vendedor = AgenteVendedor("AgenteVendedor")
-    canal = Channel("S2B")
-    Admin().connect_to([comprador, vendedor], canal)
-    Admin().report = True
-    Admin().start_system()
+comprador = AgenteComprador("AgenteComprador")
+vendedor = AgenteVendedor("AgenteVendedor")
+canal = Channel("S2B")
+Admin().connect_to([comprador, vendedor], canal)
+Admin().report = True
+Admin().start_system()
