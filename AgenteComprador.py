@@ -9,7 +9,7 @@ class AgenteComprador(Agent):
     def __init__(self, agt_name):
         super().__init__(agt_name)
         self.add(Goal("comprar"))
-        self.orcamento = 45000 #Limite de quanto gastar
+        self.orcamento = 75000 #Limite de quanto gastar
         #Variáveis de controle
         self.carroDesejado = "prisma"
         self.vendedor = ""

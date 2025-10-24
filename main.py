@@ -8,9 +8,9 @@ from Ambiente import Patio
 patio = Patio("Patio")
 canal = Channel("S2B")
 
-vendedor1 = AgenteVendedor("AgenteVendedor")
-vendedor2 = AgenteVendedor("AgenteVendedor")
-vendedor3 = AgenteVendedor("AgenteVendedor")
+vendedor1 = AgenteVendedor("AgenteVendedor", patio)
+vendedor2 = AgenteVendedor("AgenteVendedor", patio)
+vendedor3 = AgenteVendedor("AgenteVendedor", patio)
 comprador = AgenteComprador("AgenteComprador")
 comprador.add(Belief("renegociar"))#se ele aceita ou não renegociar
 

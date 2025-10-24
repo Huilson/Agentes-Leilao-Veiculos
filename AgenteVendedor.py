@@ -2,13 +2,17 @@ import random
 import threading
 
 from maspy import *
+
+from Ambiente import Patio
 from listaCarros import carros
 
+
 class AgenteVendedor(Agent):
-    def __init__(self, agt_name):
+    def __init__(self, agt_name, patio_instance):
         super().__init__(agt_name)
         self.add(Belief("negociar"))
         self.add(Goal("vender"))
+        self.patio = patio_instance
 
         #Sorteia um número, pega da lista de carros, usado para simular um carro para vender
         num = random.randint(0, 4)
@@ -23,9 +27,9 @@ class AgenteVendedor(Agent):
         #Se o pátio do leilão estiver aberto, ele pode enviar seu carro para vender
         if percepcao:
             # O carro tem como chave o nome do vendedor, chave = nome do vendedor; valor = detalhe do carro (dicionário)
-            patio.receberCarro(self.my_name, self.carro)# "Envia" o carro para o ambiente
+            self.patio.receberCarro(self.my_name, self.carro)# "Envia" o carro para o ambiente
             # agenda a negociação e a verificação do comprador
-            threading.Timer(2.0, lambda: patio.negociarCompraVenda("AgenteComprador")).start()#CHATGPT fez essa linha
+            threading.Timer(2.0, lambda: self.patio.negociarCompraVenda("AgenteComprador")).start()#CHATGPT fez essa linha
 
     @pl(gain, Belief("preco_de_compra", Any))
     def venderCarro(self, src, preco_de_compra):
