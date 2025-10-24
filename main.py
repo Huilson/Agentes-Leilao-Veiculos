@@ -1,3 +1,4 @@
+import ast
 import random
 import re
 import threading
@@ -11,6 +12,9 @@ class Patio(Environment):
     def __init__(self, env_name):
         super().__init__(env_name)
         self.create(Percept("aberto"))#Abre o leilão
+        self.carroMarca = []
+        self.melhorPreco = float('inf')
+        self.melhorCarro = {}
 
     #Essa função simula os carros que vão entrando para leilão
     def receberCarro(self, src, carro):
@@ -22,13 +26,18 @@ class Patio(Environment):
     def negociarCompraVenda(self, agt):
         self.print(f"Negociação iniciada para {agt}!")
         for carro in carrosPatio:
-            self.print(f"Criando percepção: {carro['marca']}")
-            #Percepção chave, graças a essa percepção que o comprador saberá quem tem o carro que ele deseja
-            #O nome da percepção leva a marca do carro, e o valor dessa percepção é o nome do vendedor
-            self.create(Percept(carro["marca"], carro["vendedor"], adds_event= False))
-            # PROBLEMA dessa abordagem: carros idênticos podem ser sorteados, e gerar uma percepção
-            # de mesmo nome, tendo 2 vendedores com o mesmo carro (2 vendedores para 1 carro)
-            # Na hora de vender (remover da lista) isso pode gerar uma saída indesejada
+            if carro['marca'] not in self.carroMarca:
+                if carro['preco'] <= self.melhorPreco:
+                    self.melhorPreco = carro['preco']
+                    self.melhorCarro = carro
+                self.carroMarca.append(carro['marca'])
+                self.print(f"Criando percepção: {carro['marca']}")
+                #Percepção chave, graças a essa percepção que o comprador saberá quem tem o carro que ele deseja pelo
+                #menor preço. O nome da percepção leva a marca do carro, e o valor dessa percepção é o nome do vendedor
+            self.create(Percept(self.melhorCarro['marca'], self.melhorCarro, adds_event= False))
+
+            #seria legal mandar uma percepção para os vendedores que não tiveram seus carros escolhidos
+            #para dar um stop_cycle(), só precisa refinar a lógica
 
 
 class AgenteVendedor(Agent):
@@ -38,7 +47,7 @@ class AgenteVendedor(Agent):
         self.add(Goal("vender"))
 
         #Sorteia um número, pega da lista de carros, usado para simular um carro para vender
-        num = random.randint(0, 4)
+        num = random.randint(0, 2)
         self.carro = carros[num]
         self.carro["vendedor"] = self.agent_info()["my_name"] #Adiciona o nome do Agente Vendedor
 
@@ -93,6 +102,10 @@ class AgenteComprador(Agent):
         super().__init__(agt_name)
         self.add(Goal("comprar"))
         self.orcamento = 45000 #Limite de quanto gastar
+        #Variáveis de controle
+        self.vendedor = ""
+        self.preco = ""
+        self.listaCompra = []
 
     @pl(gain, Goal("comprar"))
     def verCarros(self, src):
@@ -100,8 +113,8 @@ class AgenteComprador(Agent):
         self.print("Comprador aguardando negociação...")
         # Solução do GPT para esperar que todos os vendedores postem seus carros antes dos compradores irem até o
         # Ambiente para ver os carros disponíveis
-        # Agenda verificação da percepção 3 segundos depois (tempo suficiente para negociar)
-        threading.Timer(3.0, self.verificarCarro).start()
+        # Agenda verificação da percepção 5 segundos depois (tempo suficiente para negociar)
+        threading.Timer(5.0, self.verificarCarro).start()
 
     @pl(gain, Goal("negocio_concluido"))
     def compraFinalizada(self, src):
@@ -131,23 +144,41 @@ class AgenteComprador(Agent):
         #Essa função é usada para verificar se o carro desejado pelo comprador está no pátio (ambiente)
         percepcao = self.get(Belief("prisma", Any, source="patio"))
 
+        #---Essa parte foi o chat que fez---#
+        #Ele basicamente, desmonta a string e remonta o dicionário
+        match = re.search(r"\((\{.*\})\)", str(percepcao))
+        if match:
+            conteudo = match.group(1)  # {'marca': 'prisma', 'ano': 2015, ...}
+            carro = ast.literal_eval(conteudo)  # converte para dict
+            self.preco = carro["preco"]
+            self.vendedor = carro["vendedor"]
+
+            self.listaCompra.append((self.vendedor, self.preco))
+
+            print(f"Preço: {self.preco}, Vendedor: {self.vendedor}")
+        else:
+            print("Nenhum dicionário encontrado.")
+        #-----------------------------------#
+
         if percepcao:
-            vendedor = re.search(r'\((.*?)\)', str(percepcao)).group(1)  # Expressão regular feita pelo GPT
             # Usei a expressão acima para extrair o nome do agente vendedor
             self.print(f"Ok! O carro desejado está disponível para compra.")
-            self.print(f"O vendedor é {vendedor}... entrando em contanto...")
+            self.print(f"O vendedor é {self.vendedor}... entrando em contanto...")
             #Manda uma crença para o vendedor, avisando que os dois tem interesse no mesmo carro
             #Essa crença envia a primeira oferta do comprador
-            self.send(vendedor, tell, Belief("preco_de_compra", self.orcamento), "S2B")
+            self.send(self.vendedor, tell, Belief("preco_de_compra", self.orcamento), "S2B")
         else:
             self.print("O carro desejado não foi encontrado, sinto muito...")
-            self.send("AgenteVendedor", tell, Belief("acabou"), "S2B")
-            self.stop_cycle()
+            self.send("AgenteVendedor_1", tell, Belief("acabou"), "S2B")
+            #self.stop_cycle()
+
+    #Precisa melhor o encerramento dos agentes, infelizmente não consigo pensar em uma forma legal de fazer isso.
 
 
 # ===============================
-Admin().set_logging(show_exec=True)
-vendedor = AgenteVendedor("AgenteVendedor")
+#Admin().set_logging(show_exec=True)
+vendedor1 = AgenteVendedor("AgenteVendedor")
+vendedor2 = AgenteVendedor("AgenteVendedor")
 comprador = AgenteComprador("AgenteComprador")
 
 comprador.add(Belief("renegociar"))#Remova essa linha caso não deseje renegociar
@@ -155,6 +186,6 @@ comprador.add(Belief("renegociar"))#Remova essa linha caso não deseje renegocia
 patio = Patio("patio")
 canal = Channel("S2B")
 
-Admin().connect_to([comprador, vendedor], [canal, patio])
+Admin().connect_to([comprador, vendedor1, vendedor2], [canal, patio])
 Admin().report = True
 Admin().start_system()
