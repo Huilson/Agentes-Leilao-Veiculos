@@ -7,34 +7,35 @@ from maspy import *
 from listaCarros import carros
 
 carrosPatio = []
+lock = threading.Lock()#GPT
 
 class Patio(Environment):
     def __init__(self, env_name):
         super().__init__(env_name)
-        self.create(Percept("aberto"))#Abre o leilão
-        self.carroMarca = []
-        self.melhorPreco = float('inf')
-        self.melhorCarro = {}
+        self.create(Percept("aberto"))
+        self.carros_por_marca = {}
 
     #Essa função simula os carros que vão entrando para leilão
     def receberCarro(self, src, carro):
-        self.print(f"Recebi carro(s) do vendedor {src}")
-        self.print(f"Carro: {carro}")
-        carrosPatio.append(carro)
+        with lock:#GPT
+            self.print(f"Recebi carro(s) do vendedor {src}")
+            self.print(f"Carro: {carro}")
+            carrosPatio.append(carro)
 
     #Conecta os possíveis compradores e o vendedores
     def negociarCompraVenda(self, agt):
         self.print(f"Negociação iniciada para {agt}!")
+
         for carro in carrosPatio:
-            if carro['marca'] not in self.carroMarca:
-                if carro['preco'] <= self.melhorPreco:
-                    self.melhorPreco = carro['preco']
-                    self.melhorCarro = carro
-                self.carroMarca.append(carro['marca'])
-                self.print(f"Criando percepção: {carro['marca']}")
-                #Percepção chave, graças a essa percepção que o comprador saberá quem tem o carro que ele deseja pelo
-                #menor preço. O nome da percepção leva a marca do carro, e o valor dessa percepção é o nome do vendedor
-            self.create(Percept(self.melhorCarro['marca'], self.melhorCarro, adds_event= False))
+            marca = carro["marca"]
+            preco = carro["preco"]
+            if marca not in self.carros_por_marca or preco < self.carros_por_marca[marca]["preco"]:
+                self.carros_por_marca[marca] = carro
+        menores_valores = list(self.carros_por_marca.values())
+        self.print(f"Os melhores carros são: {menores_valores}")
+
+        for carro in menores_valores:
+            self.create(Percept(carro['marca'], carro, adds_event= False))
 
             #seria legal mandar uma percepção para os vendedores que não tiveram seus carros escolhidos
             #para dar um stop_cycle(), só precisa refinar a lógica
@@ -47,21 +48,22 @@ class AgenteVendedor(Agent):
         self.add(Goal("vender"))
 
         #Sorteia um número, pega da lista de carros, usado para simular um carro para vender
-        num = random.randint(0, 2)
+        num = random.randint(0, 4)
         self.carro = carros[num]
         self.carro["vendedor"] = self.agent_info()["my_name"] #Adiciona o nome do Agente Vendedor
 
     @pl(gain, Goal("vender"), Belief("negociar"))
     def enviarCarro(self, src):
         #O vendedor já começa querendo vender um carro
-        self.print("Vou vender um carro")
+        self.print(f"{self.my_name} vou vender um carro!")
         percepcao = self.get(Belief("aberto", source="Patio"))
         #Se o pátio do leilão estiver aberto, ele pode enviar seu carro para vender
         if percepcao:
             # O carro tem como chave o nome do vendedor, chave = nome do vendedor; valor = detalhe do carro (dicionário)
-            patio.receberCarro(self.agent_info()["my_name"], self.carro)# "Envia" o carro para o ambiente
+            patio.receberCarro(self.my_name, self.carro)# "Envia" o carro para o ambiente
+            self.wait(1)
             # agenda a negociação e a verificação do comprador
-            threading.Timer(2.0, lambda: patio.negociarCompraVenda("AgenteComprador")).start()#CHATGPT fez essa linha
+            threading.Timer(7.0, lambda: patio.negociarCompraVenda("AgenteComprador")).start()#CHATGPT fez essa linha
 
     @pl(gain, Belief("preco_de_compra", Any))
     def venderCarro(self, src, preco_de_compra):
@@ -115,7 +117,7 @@ class AgenteComprador(Agent):
         # Solução do GPT para esperar que todos os vendedores postem seus carros antes dos compradores irem até o
         # Ambiente para ver os carros disponíveis
         # Agenda verificação da percepção 5 segundos depois (tempo suficiente para negociar)
-        threading.Timer(5.0, self.verificarCarro).start()
+        threading.Timer(10.0, self.verificarCarro).start()
 
     @pl(gain, Goal("negocio_concluido"))
     def compraFinalizada(self, src):
@@ -172,22 +174,25 @@ class AgenteComprador(Agent):
             self.print("O carro desejado não foi encontrado, sinto muito...")
             self.send("AgenteVendedor_1", tell, Belief("finalizar"), "S2B")
             self.send("AgenteVendedor_2", tell, Belief("finalizar"), "S2B")
+            self.send("AgenteVendedor_3", tell, Belief("finalizar"), "S2B")
             #self.stop_cycle()
 
     #Precisa melhor o encerramento dos agentes, infelizmente não consigo pensar em uma forma legal de fazer isso.
 
 
 # ===============================
-#Admin().set_logging(show_exec=True)
-vendedor1 = AgenteVendedor("AgenteVendedor")
-vendedor2 = AgenteVendedor("AgenteVendedor")
-comprador = AgenteComprador("AgenteComprador")
-
-comprador.add(Belief("renegociar"))#Remova essa linha caso não deseje renegociar
-
 patio = Patio("Patio")
 canal = Channel("S2B")
 
-Admin().connect_to([comprador, vendedor1, vendedor2], [canal, patio])
+# Criando agentes com intervalos de 1 segundo
+vendedor1 = AgenteVendedor("AgenteVendedor")
+vendedor2 = AgenteVendedor("AgenteVendedor")
+vendedor3 = AgenteVendedor("AgenteVendedor")
+comprador = AgenteComprador("AgenteComprador")
+
+# conectar todos de uma vez
+Admin().connect_to([comprador, vendedor1, vendedor2, vendedor3], [canal, patio])
 Admin().report = True
+
+# só inicia o sistema depois que todos foram criados e conectados
 Admin().start_system()

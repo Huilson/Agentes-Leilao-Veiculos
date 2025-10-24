@@ -13,5 +13,15 @@ carro2 ={
     "ano" : 2025,
     "preco" : 150000
 }
+carro3 ={
+    "marca" : "onix",
+    "ano" : 2025,
+    "preco" : 150000
+}
+carro4 ={
+    "marca" : "onix",
+    "ano" : 2026,
+    "preco" : 180000
+}
 
-carros = [carro0, carro1, carro2]
+carros = [carro0, carro1, carro2, carro3, carro4]
