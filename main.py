@@ -52,10 +52,10 @@ class AgenteVendedor(Agent):
         self.carro["vendedor"] = self.agent_info()["my_name"] #Adiciona o nome do Agente Vendedor
 
     @pl(gain, Goal("vender"), Belief("negociar"))
-    def iniciarLeilao(self, src):
+    def enviarCarro(self, src):
         #O vendedor já começa querendo vender um carro
         self.print("Vou vender um carro")
-        percepcao = self.get(Belief("aberto", source="patio"))
+        percepcao = self.get(Belief("aberto", source="Patio"))
         #Se o pátio do leilão estiver aberto, ele pode enviar seu carro para vender
         if percepcao:
             # O carro tem como chave o nome do vendedor, chave = nome do vendedor; valor = detalhe do carro (dicionário)
@@ -91,7 +91,7 @@ class AgenteVendedor(Agent):
                 self.print("O {src} não aceita renegociar... Que pena")#Esse é o pior cenário, onde o carro não é vendido
         self.stop_cycle()
 
-    @pl(gain, Belief("acabou"))
+    @pl(gain, Goal("finalizar"))
     def semComprador(self, src):
         # Essa função é uma saída genérica para caso nade de certo
         self.print("A negociação não foi finalizada por algum motivo, encerrando...")
@@ -103,13 +103,14 @@ class AgenteComprador(Agent):
         self.add(Goal("comprar"))
         self.orcamento = 45000 #Limite de quanto gastar
         #Variáveis de controle
+        self.carroDesejado = "prisma"
         self.vendedor = ""
         self.preco = ""
         self.listaCompra = []
 
     @pl(gain, Goal("comprar"))
     def verCarros(self, src):
-        self.connect_to(Environment("patio"))
+        self.connect_to(Environment("Patio"))
         self.print("Comprador aguardando negociação...")
         # Solução do GPT para esperar que todos os vendedores postem seus carros antes dos compradores irem até o
         # Ambiente para ver os carros disponíveis
@@ -137,12 +138,12 @@ class AgenteComprador(Agent):
                         break  # evita erro de iterar enquanto remove
             else:#Pior cenário, o carro não foi vendido
                 self.print(f"Valor ainda é muito alto, que pena...")
-                self.send("AgenteVendedor", tell, Belief("acabou"), "S2B")
+                self.send("AgenteVendedor", achieve, Goal("finalizar"), "S2B")
             self.stop_cycle()
 
     def verificarCarro(self): #CHATGPT ajudou aqui
         #Essa função é usada para verificar se o carro desejado pelo comprador está no pátio (ambiente)
-        percepcao = self.get(Belief("prisma", Any, source="patio"))
+        percepcao = self.get(Belief(self.carroDesejado, Any, source="Patio"))
 
         #---Essa parte foi o chat que fez---#
         #Ele basicamente, desmonta a string e remonta o dicionário
@@ -169,7 +170,8 @@ class AgenteComprador(Agent):
             self.send(self.vendedor, tell, Belief("preco_de_compra", self.orcamento), "S2B")
         else:
             self.print("O carro desejado não foi encontrado, sinto muito...")
-            self.send("AgenteVendedor_1", tell, Belief("acabou"), "S2B")
+            self.send("AgenteVendedor_1", tell, Belief("finalizar"), "S2B")
+            self.send("AgenteVendedor_2", tell, Belief("finalizar"), "S2B")
             #self.stop_cycle()
 
     #Precisa melhor o encerramento dos agentes, infelizmente não consigo pensar em uma forma legal de fazer isso.
@@ -183,7 +185,7 @@ comprador = AgenteComprador("AgenteComprador")
 
 comprador.add(Belief("renegociar"))#Remova essa linha caso não deseje renegociar
 
-patio = Patio("patio")
+patio = Patio("Patio")
 canal = Channel("S2B")
 
 Admin().connect_to([comprador, vendedor1, vendedor2], [canal, patio])
