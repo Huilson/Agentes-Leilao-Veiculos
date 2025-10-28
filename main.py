@@ -11,11 +11,14 @@ canal = Channel("S2B")
 vendedor1 = AgenteVendedor("AgenteVendedor", patio)
 vendedor2 = AgenteVendedor("AgenteVendedor", patio)
 vendedor3 = AgenteVendedor("AgenteVendedor", patio)
+vendedor4 = AgenteVendedor("AgenteVendedor", patio)
+vendedor5 = AgenteVendedor("AgenteVendedor", patio)
+
 comprador = AgenteComprador("AgenteComprador")
 comprador.add(Belief("renegociar"))#se ele aceita ou não renegociar
 
 # conectar todos de uma vez
-Admin().connect_to([comprador, vendedor1, vendedor2, vendedor3], [canal, patio])
+Admin().connect_to([comprador, vendedor1, vendedor2, vendedor3, vendedor4, vendedor5], [canal, patio])
 Admin().report = True
 
 # só inicia o sistema depois que todos foram criados e conectados

@@ -15,7 +15,7 @@ class AgenteVendedor(Agent):
         self.patio = patio_instance
 
         #Sorteia um número, pega da lista de carros, usado para simular um carro para vender
-        num = random.randint(0, 4)
+        num = random.randint(0, 9)
         self.carro = carros[num]
         self.carro["vendedor"] = self.agent_info()["my_name"] #Adiciona o nome do Agente Vendedor
 
